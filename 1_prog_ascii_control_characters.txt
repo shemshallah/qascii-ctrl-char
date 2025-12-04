@@ -1,0 +1,211 @@
+
+#!/usr/bin/env python3
+"""
+CORRECTED: BINARY PATTERN ⊗ CONTROL CHARACTER EXPERIMENTS
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from azure.quantum import Workspace
+from azure.quantum.qiskit import AzureQuantumProvider
+import json
+import time
+from typing import Dict, List
+
+CONNECTION_STRING = "SubscriptionId=####;ResourceGroupName=Shemshallah;WorkspaceName=###@#;ApiKey=####;QuantumEndpoint=https://westus.quantum.azure.com/;"
+
+print("="*80)
+print("CORRECTED: BINARY ⊗ CONTROL CHARACTER EXPERIMENTS")
+print("="*80)
+print("Control characters as quantum transformation operators")
+print("="*80 + "\n")
+
+
+class CorrectedBinaryControlExperiment:
+    
+    def __init__(self, backend):
+        self.backend = backend
+        
+        self.control_chars = {
+            'NULL': chr(0),
+            'ETX': chr(3),
+            'BEL': chr(7),
+            'BS': chr(8),
+            'SYN': chr(22),
+            'SUB': chr(26),
+            'CAN': chr(24),
+        }
+    
+    def apply_control_operation(self, qc: QuantumCircuit, ctrl_name: str, 
+                                input_bits: List[int], target_bits: List[int]):
+        
+        # Initialize to input state
+        for i, bit in enumerate(input_bits):
+            if bit == 1:
+                qc.x(i)
+        
+        qc.barrier()
+        
+        # Apply transformation
+        if ctrl_name == 'NULL':
+            pass
+            
+        elif ctrl_name == 'ETX':
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+            
+        elif ctrl_name == 'BEL':
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            
+        elif ctrl_name == 'SYN':
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            
+        elif ctrl_name == 'BS':
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+            
+        elif ctrl_name == 'SUB':
+            qc.swap(0, 2)
+            
+        elif ctrl_name == 'CAN':
+            for i, (inp, tgt) in enumerate(zip(input_bits, target_bits)):
+                if inp != tgt:
+                    qc.x(i)
+        
+        qc.barrier()
+        return qc
+    
+    def create_circuit(self, left: str, ctrl: str, right: str):
+        qc = QuantumCircuit(3, 3)
+        
+        input_bits = [int(b) for b in left]
+        target_bits = [int(b) for b in right]
+        
+        print(f"  Input:  |{left}⟩")
+        print(f"  Target: |{right}⟩")
+        print(f"  Control: {ctrl} (ASCII {ord(self.control_chars[ctrl])})")
+        
+        self.apply_control_operation(qc, ctrl, input_bits, target_bits)
+        qc.measure([0, 1, 2], [0, 1, 2])
+        
+        return qc, input_bits, target_bits
+    
+    def run_experiment(self, qc: QuantumCircuit, shots: int = 1000):
+        """Extract counts with debugging"""
+        try:
+            qc_trans = transpile(qc, backend=self.backend, optimization_level=1)
+            job = self.backend.run(qc_trans, shots=shots)
+            result = job.result()
+            
+            # Debug: print result structure
+            print(f"\n  DEBUG: result type = {type(result)}")
+            print(f"  DEBUG: result dir = {[x for x in dir(result) if not x.startswith('_')][:10]}")
+            
+            # Try multiple extraction methods
+            methods = [
+                lambda: result.get_counts(),
+                lambda: result.get_counts(0),
+                lambda: dict(result.results[0].data.counts),
+                lambda: result.data(0)['counts'],
+                lambda: result.results[0].data.counts.int_outcomes(),
+            ]
+            
+            for i, method in enumerate(methods):
+                try:
+                    counts = method()
+                    if counts:
+                        print(f"  ✓ Method {i} worked!")
+                        return counts
+                except Exception as e:
+                    print(f"  Method {i} failed: {str(e)[:50]}")
+            
+            # Last resort: print entire result
+            print(f"\n  FULL RESULT:\n{result}")
+            return {}
+            
+        except Exception as e:
+            print(f"  ✗ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {}
+    
+    def analyze(self, counts: Dict, shots: int, input_bits: List[int], target_bits: List[int]):
+        
+        if not counts:
+            print("\n  ✗ No results\n")
+            return {'counts': {}, 'entropy': 0, 'input_prob': 0, 'target_prob': 0}
+        
+        input_state = ''.join(map(str, input_bits))
+        target_state = ''.join(map(str, target_bits))
+        
+        print("\n  RESULTS:")
+        sorted_counts = sorted(counts.items(), key=lambda x: -x[1])
+        
+        for state, count in sorted_counts[:5]:
+            prob = count / shots
+            bar = '█' * int(prob * 40)
+            marker = ''
+            if state == input_state:
+                marker = ' ← INPUT'
+            elif state == target_state:
+                marker = ' ← TARGET ✓'
+            print(f"  |{state}⟩: {count:4d} ({prob*100:5.1f}%)  {bar}{marker}")
+        
+        input_prob = counts.get(input_state, 0) / shots
+        target_prob = counts.get(target_state, 0) / shots
+        
+        print(f"\n  Input: {input_prob*100:.1f}%  Target: {target_prob*100:.1f}%")
+        
+        return {'counts': counts, 'input_prob': input_prob, 'target_prob': target_prob, 'entropy': 0}
+
+
+def main():
+    print("INITIALIZATION")
+    print("="*80)
+    
+    print("Connecting...")
+    workspace = Workspace.from_connection_string(CONNECTION_STRING)
+    provider = AzureQuantumProvider(workspace)
+    backend = provider.get_backend('rigetti.sim.qvm')
+    print("✓ Connected\n")
+    
+    experiment = CorrectedBinaryControlExperiment(backend)
+    
+    # Start with one simple test
+    test_cases = [
+        ('101', 'NULL', '101'),
+    ]
+    
+    shots = 1000
+    
+    print("EXPERIMENTS")
+    print("="*80 + "\n")
+    
+    for left, ctrl, right in test_cases:
+        print(f"{'='*80}")
+        print(f"{left} ⊗ <{ctrl}> ⊗ {right}")
+        print(f"{'='*80}")
+        
+        qc, input_bits, target_bits = experiment.create_circuit(left, ctrl, right)
+        
+        print(f"  Depth: {qc.depth()}")
+        print(f"  Running {shots} shots...")
+        
+        counts = experiment.run_experiment(qc, shots)
+        
+        if counts:
+            analysis = experiment.analyze(counts, shots, input_bits, target_bits)
+        
+        print()
+        
+        # If this works, we can add more tests
+        break
+
+
+if __name__ == "__main__":
+    main()

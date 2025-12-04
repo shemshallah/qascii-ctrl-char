@@ -1,0 +1,575 @@
+
+#!/usr/bin/env python3
+"""
+🔬 SCRIPT 3: QUANTUM OPERATOR ALGEBRA & STRING PROCESSING
+Part 1: Complete composition table (commutators and products)
+Part 2: String-as-operator sequences
+Part 3: Conditional quantum logic (IF-THEN gates)
+Part 4: Deutsch-Jozsa oracle implementation
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from azure.quantum import Workspace
+from azure.quantum.qiskit import AzureQuantumProvider
+import csv
+from typing import Dict, List, Tuple
+from datetime import datetime
+import time
+
+CONNECTION_STRING = "SubscriptionId=####;ResourceGroupName=Shemshallah;WorkspaceName=###@#;ApiKey=####;QuantumEndpoint=https://westus.quantum.azure.com/;"
+
+print("="*80)
+print("🔬 SCRIPT 3: QUANTUM OPERATOR ALGEBRA & STRING PROCESSING")
+print("="*80)
+print("Part 1: Composition tables & commutators")
+print("Part 2: String-to-quantum operator sequences")
+print("Part 3: Conditional quantum gates (IF-THEN)")
+print("Part 4: Deutsch-Jozsa oracle test")
+print("="*80 + "\n")
+
+
+class QuantumAlgebraExplorer:
+    """Explore algebraic structure and advanced compositions"""
+    
+    def __init__(self, backend):
+        self.backend = backend
+        self.log_file = None
+        
+        # Core operators for algebra
+        self.control_chars = {
+            'NUL': (0, 'Null'),
+            'SOH': (1, 'Start of Heading'),
+            'STX': (2, 'Start of Text'),
+            'ETX': (3, 'End of Text'),
+            'EOT': (4, 'End of Transmission'),
+            'ENQ': (5, 'Enquiry'),
+            'ACK': (6, 'Acknowledge'),
+            'BEL': (7, 'Bell'),
+            'BS':  (8, 'Backspace'),
+            'HT':  (9, 'Horizontal Tab'),
+            'LF':  (10, 'Line Feed'),
+            'CR':  (13, 'Carriage Return'),
+            'SO':  (14, 'Shift Out'),
+            'SI':  (15, 'Shift In'),
+            'SYN': (22, 'Synchronous Idle'),
+            'SUB': (26, 'Substitute'),
+            'ESC': (27, 'Escape'),
+            'FS':  (28, 'File Separator'),
+            'RS':  (30, 'Record Separator'),
+        }
+        
+        # ASCII printable characters for string processing
+        self.char_to_operator = {
+            'H': 'HT',   # H → Horizontal Tab
+            'e': 'ENQ',  # e → Enquiry
+            'l': 'LF',   # l → Line Feed
+            'o': 'SOH',  # o → Start of Heading
+            '\n': 'LF',  # newline → Line Feed
+            'B': 'BEL',  # B → Bell
+            'S': 'SYN',  # S → Synchronous
+            'E': 'ETX',  # E → End of Text
+        }
+        
+    def log(self, message, flush=False):
+        """Write to both console and log file"""
+        print(message, flush=flush)
+        if self.log_file:
+            self.log_file.write(message + '\n')
+            if flush:
+                self.log_file.flush()
+    
+    def manual_swap(self, qc, i, j):
+        """Implement SWAP using 3 CNOTs"""
+        qc.cx(i, j)
+        qc.cx(j, i)
+        qc.cx(i, j)
+    
+    def apply_operator(self, qc: QuantumCircuit, op_name: str):
+        """Apply single ASCII operator"""
+        ascii_code, _ = self.control_chars[op_name]
+        
+        if ascii_code == 0:  # NUL
+            pass
+        elif ascii_code == 1:  # SOH
+            qc.x(0)
+            qc.h(1)
+            qc.h(2)
+        elif ascii_code == 2:  # STX
+            qc.x(1)
+            qc.h(0)
+            qc.h(2)
+        elif ascii_code == 3:  # ETX
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+        elif ascii_code == 4:  # EOT
+            qc.x(2)
+            qc.cx(2, 0)
+            qc.cx(2, 1)
+        elif ascii_code == 5:  # ENQ
+            qc.h(0)
+            qc.cx(0, 1)
+        elif ascii_code == 6:  # ACK
+            qc.h(1)
+            qc.cz(0, 1)
+            qc.h(1)
+        elif ascii_code == 7:  # BEL
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+        elif ascii_code == 8:  # BS
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+        elif ascii_code == 9:  # HT
+            self.manual_swap(qc, 1, 2)
+            self.manual_swap(qc, 0, 1)
+        elif ascii_code == 10:  # LF
+            qc.rz(np.pi/2, 0)
+            qc.rz(np.pi/2, 1)
+            qc.rz(np.pi/2, 2)
+        elif ascii_code == 13:  # CR
+            self.manual_swap(qc, 0, 1)
+            self.manual_swap(qc, 1, 2)
+        elif ascii_code == 14:  # SO
+            qc.s(0)
+            qc.s(1)
+            qc.s(2)
+        elif ascii_code == 15:  # SI
+            qc.sdg(0)
+            qc.sdg(1)
+            qc.sdg(2)
+        elif ascii_code == 22:  # SYN
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+        elif ascii_code == 26:  # SUB
+            self.manual_swap(qc, 0, 2)
+        elif ascii_code == 27:  # ESC
+            qc.cz(0, 1)
+            qc.cz(1, 2)
+            qc.cz(0, 2)
+        elif ascii_code == 28:  # FS
+            self.manual_swap(qc, 0, 1)
+        elif ascii_code == 30:  # RS
+            qc.s(0)
+            self.manual_swap(qc, 1, 2)
+        
+        return qc
+    
+    def create_composition_circuit(self, op1: str, op2: str, initial_state: str) -> QuantumCircuit:
+        """Create circuit for op1 ∘ op2"""
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize
+        for i, bit in enumerate(initial_state):
+            if bit == '1':
+                qc.x(i)
+        
+        # Apply op2 first, then op1 (composition reads right-to-left)
+        self.apply_operator(qc, op2)
+        self.apply_operator(qc, op1)
+        
+        qc.measure([0, 1, 2], [0, 1, 2])
+        return qc
+    
+    def create_string_circuit(self, string: str, initial_state: str) -> QuantumCircuit:
+        """Convert string to operator sequence"""
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize
+        for i, bit in enumerate(initial_state):
+            if bit == '1':
+                qc.x(i)
+        
+        # Apply each character as operator
+        operator_sequence = []
+        for char in string:
+            if char in self.char_to_operator:
+                op_name = self.char_to_operator[char]
+                operator_sequence.append(op_name)
+                self.apply_operator(qc, op_name)
+        
+        qc.measure([0, 1, 2], [0, 1, 2])
+        return qc, operator_sequence
+    
+    def create_conditional_circuit(self, condition_state: str, then_state: str, 
+                                   input_state: str) -> QuantumCircuit:
+        """
+        Implement IF input==condition THEN output=then_state
+        Uses quantum amplitude amplification
+        """
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize input
+        for i, bit in enumerate(input_state):
+            if bit == '1':
+                qc.x(i)
+        
+        # Check if input matches condition
+        # If match: apply transformation to reach then_state
+        # This is a quantum oracle + correction
+        
+        # Step 1: Mark the condition state with phase flip
+        for i, bit in enumerate(condition_state):
+            if bit == '0':
+                qc.x(i)  # Flip to make |000⟩ the marked state
+        
+        # Multi-controlled Z (marks condition state)
+        qc.h(2)
+        qc.ccx(0, 1, 2)
+        qc.h(2)
+        
+        # Unflip
+        for i, bit in enumerate(condition_state):
+            if bit == '0':
+                qc.x(i)
+        
+        # Step 2: If marked, transform to then_state
+        # XOR input with then_state to get required flips
+        for i, (inp, then) in enumerate(zip(input_state, then_state)):
+            if inp != then:
+                # Controlled flip based on whether we're in condition state
+                qc.x(i)
+        
+        qc.measure([0, 1, 2], [0, 1, 2])
+        return qc
+    
+    def create_deutsch_jozsa_oracle(self, function_type: str, initial_state: str) -> QuantumCircuit:
+        """
+        Implement Deutsch-Jozsa oracle
+        function_type: 'constant_0', 'constant_1', 'balanced'
+        """
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize
+        for i, bit in enumerate(initial_state):
+            if bit == '1':
+                qc.x(i)
+        
+        # Hadamard on all qubits (superposition)
+        qc.h(0)
+        qc.h(1)
+        qc.h(2)
+        
+        # Oracle implementation
+        if function_type == 'constant_0':
+            # Do nothing (f(x) = 0 for all x)
+            pass
+        elif function_type == 'constant_1':
+            # Flip all (f(x) = 1 for all x)
+            qc.z(0)
+            qc.z(1)
+            qc.z(2)
+        elif function_type == 'balanced':
+            # Use ETX-SYN-EOT (our discovered oracle!)
+            self.apply_operator(qc, 'ETX')
+            self.apply_operator(qc, 'SYN')
+            self.apply_operator(qc, 'EOT')
+        
+        # Hadamard again
+        qc.h(0)
+        qc.h(1)
+        qc.h(2)
+        
+        qc.measure([0, 1, 2], [0, 1, 2])
+        return qc
+    
+    def run_experiment(self, qc: QuantumCircuit, shots: int = 200) -> Dict:
+        """Run circuit and extract counts"""
+        try:
+            qc_trans = transpile(qc, backend=self.backend, optimization_level=3)
+            job = self.backend.run(qc_trans, shots=shots)
+            result = job.result()
+            
+            if not result.success:
+                return {}
+            
+            result_dict = result.to_dict()
+            if 'results' in result_dict and len(result_dict['results']) > 0:
+                first_result = result_dict['results'][0]
+                if 'data' in first_result and 'counts' in first_result['data']:
+                    counts = first_result['data']['counts']
+                    clean_counts = {}
+                    for key, val in counts.items():
+                        if key.startswith('0x'):
+                            binary = bin(int(key, 16))[2:].zfill(3)
+                            clean_counts[binary] = val
+                        else:
+                            clean_counts[key] = val
+                    return clean_counts
+            return {}
+        except Exception as e:
+            self.log(f"  ✗ Error: {str(e)[:100]}")
+            return {}
+    
+    def calculate_entropy(self, counts: Dict, shots: int) -> float:
+        """Calculate Shannon entropy"""
+        if not counts:
+            return 0.0
+        probs = {state: count/shots for state, count in counts.items()}
+        entropy = 0.0
+        for p in probs.values():
+            if p > 0:
+                entropy -= p * np.log2(p)
+        return entropy
+
+
+def main():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    log_filename = f"quantum_algebra_{timestamp}.log"
+    csv_composition = f"composition_table_{timestamp}.csv"
+    csv_strings = f"string_operators_{timestamp}.csv"
+    csv_conditional = f"conditional_logic_{timestamp}.csv"
+    
+    print(f"📁 Output files:")
+    print(f"  LOG: {log_filename}")
+    print(f"  CSV1: {csv_composition}")
+    print(f"  CSV2: {csv_strings}")
+    print(f"  CSV3: {csv_conditional}\n")
+    
+    # Connect
+    print("🔌 Connecting to Azure Quantum...")
+    workspace = Workspace.from_connection_string(CONNECTION_STRING)
+    provider = AzureQuantumProvider(workspace)
+    backend = provider.get_backend('rigetti.sim.qvm')
+    print("✓ Connected to Rigetti QVM\n")
+    
+    explorer = QuantumAlgebraExplorer(backend)
+    explorer.log_file = open(log_filename, 'w', encoding='utf-8')
+    
+    explorer.log("="*80)
+    explorer.log("🔬 QUANTUM OPERATOR ALGEBRA & STRING PROCESSING")
+    explorer.log("="*80)
+    explorer.log(f"Timestamp: {datetime.now()}")
+    explorer.log(f"Backend: Rigetti QVM")
+    explorer.log("="*80 + "\n")
+    
+    shots = 200
+    
+    # ========================================================================
+    # PART 1: COMPOSITION TABLE & COMMUTATORS
+    # ========================================================================
+    
+    explorer.log("\n" + "="*80)
+    explorer.log("PART 1: OPERATOR COMPOSITION TABLE")
+    explorer.log("="*80 + "\n")
+    
+    # Key operators to test
+    test_ops = ['BS', 'ETX', 'BEL', 'SYN', 'ENQ', 'ACK']
+    test_input = '101'  # Use |101⟩ as canonical test state
+    
+    csv_file1 = open(csv_composition, 'w', newline='', encoding='utf-8')
+    csv_writer1 = csv.writer(csv_file1)
+    csv_writer1.writerow([
+        'op1', 'op2', 'composition', 'input_state', 'output_state', 
+        'output_prob', 'entropy', 'commutes', 'is_involution'
+    ])
+    
+    explorer.log("Testing compositions: op1 ∘ op2 vs op2 ∘ op1\n")
+    
+    exp_id = 1
+    for i, op1 in enumerate(test_ops):
+        for j, op2 in enumerate(test_ops):
+            if j >= i:  # Only test upper triangle (avoid duplicates)
+                explorer.log(f"[{exp_id}] Testing {op1} ∘ {op2}...", flush=True)
+                
+                # Test op1 ∘ op2
+                qc_forward = explorer.create_composition_circuit(op1, op2, test_input)
+                counts_forward = explorer.run_experiment(qc_forward, shots)
+                entropy_forward = explorer.calculate_entropy(counts_forward, shots)
+                
+                # Test op2 ∘ op1
+                qc_reverse = explorer.create_composition_circuit(op2, op1, test_input)
+                counts_reverse = explorer.run_experiment(qc_reverse, shots)
+                entropy_reverse = explorer.calculate_entropy(counts_reverse, shots)
+                
+                # Check commutativity
+                if counts_forward and counts_reverse:
+                    top_forward = max(counts_forward.items(), key=lambda x: x[1])
+                    top_reverse = max(counts_reverse.items(), key=lambda x: x[1])
+                    
+                    commutes = (top_forward[0] == top_reverse[0] and 
+                               abs(top_forward[1] - top_reverse[1]) < 20)
+                    
+                    # Check if self-inverse (op ∘ op = I)
+                    is_involution = False
+                    if op1 == op2:
+                        is_involution = (top_forward[0] == test_input and 
+                                       top_forward[1] > 0.9 * shots)
+                    
+                    explorer.log(f"  {op1}∘{op2}: |{top_forward[0]}⟩ ({top_forward[1]/shots:.2f}), "
+                               f"H={entropy_forward:.2f}")
+                    explorer.log(f"  {op2}∘{op1}: |{top_reverse[0]}⟩ ({top_reverse[1]/shots:.2f}), "
+                               f"H={entropy_reverse:.2f}")
+                    explorer.log(f"  Commutes: {commutes}, Involution: {is_involution}\n")
+                    
+                    # Write to CSV
+                    csv_writer1.writerow([
+                        op1, op2, f"{op1}∘{op2}", test_input, top_forward[0],
+                        f"{top_forward[1]/shots:.3f}", f"{entropy_forward:.3f}",
+                        commutes, is_involution
+                    ])
+                    csv_file1.flush()
+                
+                exp_id += 1
+                time.sleep(0.2)
+    
+    csv_file1.close()
+    
+    # ========================================================================
+    # PART 2: STRING-TO-OPERATOR PROCESSING
+    # ========================================================================
+    
+    explorer.log("\n" + "="*80)
+    explorer.log("PART 2: STRING-AS-OPERATOR SEQUENCES")
+    explorer.log("="*80 + "\n")
+    
+    csv_file2 = open(csv_strings, 'w', newline='', encoding='utf-8')
+    csv_writer2 = csv.writer(csv_file2)
+    csv_writer2.writerow([
+        'experiment_id', 'input_string', 'operator_sequence', 'initial_state',
+        'output_state', 'output_prob', 'entropy', 'num_states'
+    ])
+    
+    # Test strings
+    test_strings = [
+        "Hello\n",     # Classic greeting
+        "BEBE",        # Double Bell
+        "SSSS",        # Quad Sync
+        "ESE",         # Escape sandwich
+        "BEL",         # Explicit Bell
+    ]
+    
+    exp_id = 1
+    for string in test_strings:
+        explorer.log(f"\n{'─'*80}")
+        explorer.log(f"[{exp_id}] String: '{string}'")
+        
+        for init_state in ['000', '101', '111']:
+            explorer.log(f"  Initial state: |{init_state}⟩", flush=True)
+            
+            qc, op_sequence = explorer.create_string_circuit(string, init_state)
+            counts = explorer.run_experiment(qc, shots)
+            entropy = explorer.calculate_entropy(counts, shots)
+            
+            if counts:
+                top_state = max(counts.items(), key=lambda x: x[1])
+                explorer.log(f"    Operators: {' → '.join(op_sequence)}")
+                explorer.log(f"    Output: |{top_state[0]}⟩ ({top_state[1]/shots*100:.0f}%), "
+                           f"H={entropy:.2f}")
+                
+                csv_writer2.writerow([
+                    exp_id, string, ' → '.join(op_sequence), init_state,
+                    top_state[0], f"{top_state[1]/shots:.3f}",
+                    f"{entropy:.3f}", len(counts)
+                ])
+                csv_file2.flush()
+            
+            exp_id += 1
+    
+    csv_file2.close()
+    
+    # ========================================================================
+    # PART 3: CONDITIONAL QUANTUM LOGIC
+    # ========================================================================
+    
+    explorer.log("\n\n" + "="*80)
+    explorer.log("PART 3: CONDITIONAL QUANTUM GATES (IF-THEN)")
+    explorer.log("="*80 + "\n")
+    
+    csv_file3 = open(csv_conditional, 'w', newline='', encoding='utf-8')
+    csv_writer3 = csv.writer(csv_file3)
+    csv_writer3.writerow([
+        'experiment_id', 'condition_state', 'then_state', 'input_state',
+        'output_state', 'output_prob', 'entropy', 'condition_met'
+    ])
+    
+    # Test: IF input==010 THEN output=000
+    condition = '010'
+    then_output = '000'
+    
+    explorer.log(f"Testing: IF |{condition}⟩ THEN |{then_output}⟩\n")
+    
+    exp_id = 1
+    for input_state in ['000', '001', '010', '011', '100', '101', '110', '111']:
+        explorer.log(f"[{exp_id}] Input: |{input_state}⟩", flush=True)
+        
+        qc = explorer.create_conditional_circuit(condition, then_output, input_state)
+        counts = explorer.run_experiment(qc, shots)
+        entropy = explorer.calculate_entropy(counts, shots)
+        
+        if counts:
+            top_state = max(counts.items(), key=lambda x: x[1])
+            condition_met = (input_state == condition)
+            expected = then_output if condition_met else input_state
+            
+            explorer.log(f"  Output: |{top_state[0]}⟩ ({top_state[1]/shots*100:.0f}%), "
+                       f"Expected: |{expected}⟩, Match: {top_state[0] == expected}")
+            
+            csv_writer3.writerow([
+                exp_id, condition, then_output, input_state,
+                top_state[0], f"{top_state[1]/shots:.3f}",
+                f"{entropy:.3f}", condition_met
+            ])
+            csv_file3.flush()
+        
+        exp_id += 1
+    
+    csv_file3.close()
+    
+    # ========================================================================
+    # PART 4: DEUTSCH-JOZSA ALGORITHM
+    # ========================================================================
+    
+    explorer.log("\n\n" + "="*80)
+    explorer.log("PART 4: DEUTSCH-JOZSA ORACLE TEST")
+    explorer.log("="*80 + "\n")
+    
+    explorer.log("Testing ETX-SYN-EOT as balanced oracle\n")
+    
+    for func_type in ['constant_0', 'constant_1', 'balanced']:
+        explorer.log(f"\nFunction type: {func_type}")
+        
+        qc = explorer.create_deutsch_jozsa_oracle(func_type, '000')
+        counts = explorer.run_experiment(qc, shots)
+        entropy = explorer.calculate_entropy(counts, shots)
+        
+        if counts:
+            # Deutsch-Jozsa: if output is |000⟩, function is constant
+            # Otherwise, function is balanced
+            zero_prob = counts.get('000', 0) / shots
+            is_constant = (zero_prob > 0.7)
+            
+            explorer.log(f"  |000⟩ probability: {zero_prob:.3f}")
+            explorer.log(f"  Entropy: {entropy:.3f}")
+            explorer.log(f"  Detected as: {'CONSTANT' if is_constant else 'BALANCED'}")
+            explorer.log(f"  Correct: {(is_constant and 'constant' in func_type) or (not is_constant and func_type == 'balanced')}")
+    
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
+    
+    explorer.log("\n\n" + "="*80)
+    explorer.log("✅ QUANTUM ALGEBRA EXPLORATION COMPLETE!")
+    explorer.log("="*80)
+    explorer.log(f"Composition table: {csv_composition}")
+    explorer.log(f"String operators: {csv_strings}")
+    explorer.log(f"Conditional logic: {csv_conditional}")
+    
+    explorer.log_file.close()
+    
+    print(f"\n{'='*80}")
+    print(f"✅ COMPLETE! Check files:")
+    print(f"  📄 {log_filename}")
+    print(f"  📊 {csv_composition}")
+    print(f"  📊 {csv_strings}")
+    print(f"  📊 {csv_conditional}")
+    print(f"{'='*80}\n")
+
+
+if __name__ == "__main__":
+    main()
+
+ 

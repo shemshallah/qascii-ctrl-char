@@ -1,0 +1,433 @@
+#!/usr/bin/env python3
+"""
+================================================================================
+🔬 COMPLETE QUANTUM ALGEBRA TEST SUITE - AZURE QUANTUM
+================================================================================
+Includes:
+  1. Extended IF-THEN testing (6 triggers × 5 runs = 30 tests)
+  2. Corrected Deutsch-Jozsa
+  3. Involution testing
+  4. Complete analysis
+
+Author: Shemshallah (Justin Howard-Stanley)
+Date: December 2024
+================================================================================
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from azure.quantum import Workspace
+from azure.quantum.qiskit import AzureQuantumProvider
+import csv
+import time
+from datetime import datetime
+
+# ============================================================================
+# AZURE QUANTUM CONNECTION (EXACT FROM YOUR FILES)
+# ============================================================================
+
+CONNECTION_STRING = "SubscriptionId=e5da6bc7-cd1c-48b9-8294-1e3e84ef1c36;ResourceGroupName=Shemshallah;WorkspaceName=Shem;ApiKey=NeCH8_ANow_EB7zGdom83K4629yTGcASQGBt7U4f1WchTazZQdjVAKJI815JWJ5txsLtcH_QRrBFAZQUUGdq3w;QuantumEndpoint=https://westus.quantum.azure.com/;"
+
+SHOTS = 1024
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+def timestamp():
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+def shannon_entropy(counts, shots):
+    entropy = 0.0
+    for count in counts.values():
+        p = count / shots
+        if p > 0:
+            entropy -= p * np.log2(p)
+    return entropy
+
+def dominant_state(counts):
+    if not counts:
+        return '000', 0.0
+    max_state = max(counts, key=counts.get)
+    max_prob = counts[max_state] / sum(counts.values())
+    return max_state, max_prob
+
+# ============================================================================
+# IF-THEN GATE
+# ============================================================================
+
+def create_if_then_gate(trigger: str, then_state: str):
+    """Create IF-THEN gate with proper 3-qubit controlled operation"""
+    qc = QuantumCircuit(3, 3)
+    
+    # Step 1: Encode trigger
+    for i, bit in enumerate(trigger):
+        if bit == '0':
+            qc.x(i)
+    
+    # Step 2: Multi-controlled transformation
+    for i, (trigger_bit, then_bit) in enumerate(zip(trigger, then_state)):
+        if trigger_bit != then_bit:
+            if i == 0:
+                qc.ccx(1, 2, 0)
+            elif i == 1:
+                qc.ccx(0, 2, 1)
+            elif i == 2:
+                qc.ccx(0, 1, 2)
+    
+    # Step 3: Uncompute
+    for i, bit in enumerate(trigger):
+        if bit == '0':
+            qc.x(i)
+    
+    return qc
+
+def test_if_then_trigger(backend, trigger: str, then_state: str, num_runs: int = 5):
+    """Test IF-THEN gate with specific trigger multiple times"""
+    
+    results = []
+    successes = 0
+    
+    for run in range(1, num_runs + 1):
+        # Create circuit
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize to trigger state
+        for i, bit in enumerate(trigger):
+            if bit == '1':
+                qc.x(i)
+        
+        # Apply IF-THEN gate
+        qc_control = create_if_then_gate(trigger, then_state)
+        qc = qc.compose(qc_control)
+        
+        # Measure
+        qc.measure([0, 1, 2], [0, 1, 2])
+        
+        # Execute
+        qc_trans = transpile(qc, backend=backend, optimization_level=3)
+        job = backend.run(qc_trans, shots=SHOTS)
+        counts = job.result().get_counts()
+        
+        # Analyze
+        output, prob = dominant_state(counts)
+        success = (output == then_state)
+        
+        if success:
+            successes += 1
+        
+        status = "✓" if success else "✗"
+        print(f"{status} Run {run}: |{trigger}⟩ → |{output}⟩ (p={prob:.3f}) | Expected: |{then_state}⟩")
+        
+        results.append({
+            'trigger': trigger,
+            'then_state': then_state,
+            'run': run,
+            'output': output,
+            'probability': prob,
+            'success': success
+        })
+        
+        time.sleep(0.2)
+    
+    success_rate = successes / num_runs
+    print(f"  Success: {successes}/{num_runs} ({success_rate*100:.1f}%)\n")
+    
+    return results, success_rate
+
+# ============================================================================
+# DEUTSCH-JOZSA
+# ============================================================================
+
+def deutsch_jozsa_corrected(backend, function_type: str):
+    """Corrected Deutsch-Jozsa with proper phase oracle"""
+    qc = QuantumCircuit(3, 3)
+    
+    qc.h([0, 1, 2])
+    
+    if function_type == 'constant_0':
+        pass
+    elif function_type == 'constant_1':
+        qc.z([0, 1, 2])
+    elif function_type == 'balanced':
+        qc.cx(0, 2)
+        qc.cx(1, 2)
+    
+    qc.h([0, 1, 2])
+    qc.measure([0, 1, 2], [0, 1, 2])
+    
+    qc_trans = transpile(qc, backend=backend, optimization_level=3)
+    job = backend.run(qc_trans, shots=SHOTS)
+    counts = job.result().get_counts()
+    
+    prob_000 = counts.get('000', 0) / SHOTS
+    entropy = shannon_entropy(counts, SHOTS)
+    
+    if prob_000 > 0.9:
+        detected = 'CONSTANT'
+    else:
+        detected = 'BALANCED'
+    
+    if function_type.startswith('constant'):
+        correct = (detected == 'CONSTANT')
+    else:
+        correct = (detected == 'BALANCED')
+    
+    return {
+        'function_type': function_type,
+        'prob_000': prob_000,
+        'entropy': entropy,
+        'detected': detected,
+        'correct': correct
+    }
+
+# ============================================================================
+# INVOLUTIONS
+# ============================================================================
+
+def apply_ascii_operator(qc, char_code, qubits=3):
+    """Apply quantum operator based on ASCII control character"""
+    bits = [(char_code >> i) & 1 for i in range(min(qubits, 8))]
+    
+    for i, bit in enumerate(bits[:qubits]):
+        if bit:
+            qc.x(i)
+    
+    if char_code % 2 == 1:
+        qc.h(0)
+        if qubits > 1:
+            qc.cx(0, 1)
+    
+    if char_code % 4 >= 2:
+        if qubits > 1:
+            qc.h(1)
+        if qubits > 2:
+            qc.cx(1, 2)
+    
+    if char_code % 8 >= 4:
+        if qubits > 2:
+            qc.h(2)
+            qc.cx(2, 0)
+    
+    return qc
+
+def test_involution(backend, name: str, code: int):
+    """Test if operator is involution (A² = I)"""
+    qc = QuantumCircuit(3, 3)
+    qc.x([0, 2])  # |101⟩
+    
+    apply_ascii_operator(qc, code)
+    apply_ascii_operator(qc, code)
+    
+    qc.measure([0, 1, 2], [0, 1, 2])
+    
+    qc_trans = transpile(qc, backend=backend, optimization_level=3)
+    job = backend.run(qc_trans, shots=SHOTS)
+    counts = job.result().get_counts()
+    
+    prob_101 = counts.get('101', 0) / SHOTS
+    entropy = shannon_entropy(counts, SHOTS)
+    
+    is_involution = prob_101 > 0.95 and entropy < 0.1
+    
+    return {
+        'name': name,
+        'code': code,
+        'prob_101': prob_101,
+        'entropy': entropy,
+        'is_involution': is_involution
+    }
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+def main():
+    print("="*80)
+    print("🔬 COMPLETE QUANTUM ALGEBRA TEST SUITE - AZURE QUANTUM")
+    print("="*80)
+    print("Extended IF-THEN + Deutsch-Jozsa + Involutions")
+    print("="*80)
+    print(f"Timestamp: {datetime.now()}")
+    print("="*80)
+    
+    # Connect to Azure Quantum
+    print("\n🔌 Connecting to Azure Quantum...")
+    print("Connecting...")
+    workspace = Workspace.from_connection_string(CONNECTION_STRING)
+    provider = AzureQuantumProvider(workspace)
+    backend = provider.get_backend('rigetti.sim.qvm')
+    print("✓ Connected\n")
+    
+    ts = timestamp()
+    
+    # ========================================================================
+    # EXPERIMENT 1: EXTENDED IF-THEN TESTING
+    # ========================================================================
+    
+    print("\n" + "="*80)
+    print("EXPERIMENT 1: EXTENDED IF-THEN TESTING")
+    print("="*80)
+    print("Testing 6 different triggers (5 runs each)\n")
+    
+    triggers_to_test = ['010', '101', '011', '110', '111', '000']
+    target_state = '000'
+    
+    all_if_then_results = []
+    trigger_summary = {}
+    
+    for trigger in triggers_to_test:
+        print(f"{'='*80}")
+        print(f"Testing: IF |{trigger}⟩ THEN |{target_state}⟩")
+        print('='*80)
+        
+        results, success_rate = test_if_then_trigger(
+            backend, trigger, target_state, num_runs=5
+        )
+        
+        all_if_then_results.extend(results)
+        trigger_summary[trigger] = {
+            'success_rate': success_rate,
+            'typical_output': results[0]['output'] if results else 'N/A'
+        }
+    
+    # Save IF-THEN results
+    csv_filename = f'extended_if_then_{ts}.csv'
+    with open(csv_filename, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['trigger', 'then_state', 'run', 'output', 'probability', 'success'])
+        for result in all_if_then_results:
+            writer.writerow([
+                result['trigger'],
+                result['then_state'],
+                result['run'],
+                result['output'],
+                result['probability'],
+                result['success']
+            ])
+    
+    print(f"\n✓ Saved: {csv_filename}")
+    
+    # ========================================================================
+    # EXPERIMENT 2: DEUTSCH-JOZSA
+    # ========================================================================
+    
+    print("\n" + "="*80)
+    print("EXPERIMENT 2: CORRECTED DEUTSCH-JOZSA")
+    print("="*80)
+    
+    dj_results = {}
+    for func_type in ['constant_0', 'constant_1', 'balanced']:
+        print(f"\nTesting {func_type}...")
+        result = deutsch_jozsa_corrected(backend, func_type)
+        dj_results[func_type] = result
+        
+        status = "✓" if result['correct'] else "✗"
+        print(f"{status} {func_type}: |000⟩ p={result['prob_000']:.3f}, Detected as {result['detected']}")
+        
+        time.sleep(0.3)
+    
+    # Save DJ results
+    csv_filename_dj = f'deutsch_jozsa_{ts}.csv'
+    with open(csv_filename_dj, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['function_type', 'prob_000', 'entropy', 'detected', 'correct'])
+        for func_type, data in dj_results.items():
+            writer.writerow([
+                func_type,
+                data['prob_000'],
+                data['entropy'],
+                data['detected'],
+                data['correct']
+            ])
+    
+    print(f"\n✓ Saved: {csv_filename_dj}")
+    
+    # ========================================================================
+    # EXPERIMENT 3: INVOLUTIONS
+    # ========================================================================
+    
+    print("\n" + "="*80)
+    print("EXPERIMENT 3: INVOLUTION TESTING")
+    print("="*80)
+    
+    test_ops = {
+        'BS': 0x08,
+        'ETX': 0x03,
+        'SYN': 0x16,
+        'ACK': 0x06,
+    }
+    
+    involution_results = []
+    involutions_found = []
+    
+    for name, code in test_ops.items():
+        print(f"\nTesting {name}² (0x{code:02X})...")
+        result = test_involution(backend, name, code)
+        involution_results.append(result)
+        
+        status = "✓" if result['is_involution'] else "✗"
+        print(f"{status} {name}²: |101⟩ p={result['prob_101']:.3f}, H={result['entropy']:.2f}, Involution: {result['is_involution']}")
+        
+        if result['is_involution']:
+            involutions_found.append(name)
+        
+        time.sleep(0.3)
+    
+    # Save involution results
+    csv_filename_inv = f'involutions_{ts}.csv'
+    with open(csv_filename_inv, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['name', 'code', 'prob_101', 'entropy', 'is_involution'])
+        for result in involution_results:
+            writer.writerow([
+                result['name'],
+                result['code'],
+                result['prob_101'],
+                result['entropy'],
+                result['is_involution']
+            ])
+    
+    print(f"\n✓ Saved: {csv_filename_inv}")
+    print(f"\nInvolutions found: {involutions_found}")
+    
+    # ========================================================================
+    # FINAL SUMMARY
+    # ========================================================================
+    
+    print("\n" + "="*80)
+    print("✅ ALL EXPERIMENTS COMPLETE!")
+    print("="*80)
+    
+    print(f"\n📊 IF-THEN TESTING SUMMARY:")
+    print("-"*80)
+    for trigger, data in trigger_summary.items():
+        rate = data['success_rate']
+        output = data['typical_output']
+        status = "✓" if rate >= 0.8 else "✗"
+        print(f"{status} |{trigger}⟩ → |{output}⟩: {rate*100:.0f}% success")
+    
+    overall_if_then = sum(d['success_rate'] for d in trigger_summary.values()) / len(trigger_summary)
+    print(f"\nOverall IF-THEN success: {overall_if_then*100:.1f}%")
+    
+    print(f"\n📊 DEUTSCH-JOZSA SUMMARY:")
+    print("-"*80)
+    dj_correct = sum(1 for r in dj_results.values() if r['correct'])
+    print(f"Correct classifications: {dj_correct}/3")
+    
+    print(f"\n📊 INVOLUTIONS SUMMARY:")
+    print("-"*80)
+    print(f"Involutions found: {len(involutions_found)}/4")
+    print(f"List: {involutions_found}")
+    
+    print(f"\n📁 Output files:")
+    print(f"  - {csv_filename}")
+    print(f"  - {csv_filename_dj}")
+    print(f"  - {csv_filename_inv}")
+    
+    print("\n" + "="*80)
+    print("🌟 Analysis complete!")
+    print("="*80)
+
+if __name__ == "__main__":
+    main()

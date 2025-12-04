@@ -1,0 +1,493 @@
+
+#!/usr/bin/env python3
+"""
+🔬 SCRIPT 1: COMPLETE ASCII CONTROL CHARACTER QUANTUM OPERATOR DICTIONARY
+- Fix failed SWAP-based operators with manual CNOT decomposition
+- Test all working operators on all 8 basis states
+- Comprehensive mapping of input → operator → output
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from azure.quantum import Workspace
+from azure.quantum.qiskit import AzureQuantumProvider
+import csv
+import time
+from typing import Dict, List
+from datetime import datetime
+
+CONNECTION_STRING = "SubscriptionId=####;ResourceGroupName=Shemshallah;WorkspaceName=###@#;ApiKey=####;QuantumEndpoint=https://westus.quantum.azure.com/;"
+
+print("="*80)
+print("🔬 SCRIPT 1: COMPLETE QUANTUM OPERATOR DICTIONARY")
+print("="*80)
+print("Part A: Fix failed SWAP operators")
+print("Part B: Test all operators on all 8 input states")
+print("="*80 + "\n")
+
+
+class QuantumOperatorDictionary:
+    
+    def __init__(self, backend):
+        self.backend = backend
+        self.log_file = None
+        
+        # ALL ASCII Control Characters
+        self.control_chars = {
+            'NUL': (0, 'Null'),
+            'SOH': (1, 'Start of Heading'),
+            'STX': (2, 'Start of Text'),
+            'ETX': (3, 'End of Text / ^C Interrupt'),
+            'EOT': (4, 'End of Transmission'),
+            'ENQ': (5, 'Enquiry'),
+            'ACK': (6, 'Acknowledge'),
+            'BEL': (7, 'Bell / Alert'),
+            'BS':  (8, 'Backspace'),
+            'HT':  (9, 'Horizontal Tab'),
+            'LF':  (10, 'Line Feed'),
+            'VT':  (11, 'Vertical Tab'),
+            'FF':  (12, 'Form Feed'),
+            'CR':  (13, 'Carriage Return'),
+            'SO':  (14, 'Shift Out'),
+            'SI':  (15, 'Shift In'),
+            'DLE': (16, 'Data Link Escape'),
+            'DC1': (17, 'Device Control 1 / XON'),
+            'DC2': (18, 'Device Control 2'),
+            'DC3': (19, 'Device Control 3 / XOFF'),
+            'DC4': (20, 'Device Control 4'),
+            'NAK': (21, 'Negative Acknowledge'),
+            'SYN': (22, 'Synchronous Idle'),
+            'ETB': (23, 'End of Transmission Block'),
+            'CAN': (24, 'Cancel'),
+            'EM':  (25, 'End of Medium'),
+            'SUB': (26, 'Substitute'),
+            'ESC': (27, 'Escape'),
+            'FS':  (28, 'File Separator'),
+            'GS':  (29, 'Group Separator'),
+            'RS':  (30, 'Record Separator'),
+            'US':  (31, 'Unit Separator'),
+            'DEL': (127, 'Delete'),
+        }
+        
+    def log(self, message, flush=False):
+        """Write to both console and log file"""
+        print(message, flush=flush)
+        if self.log_file:
+            self.log_file.write(message + '\n')
+            if flush:
+                self.log_file.flush()
+    
+    def manual_swap(self, qc, i, j):
+        """Implement SWAP using 3 CNOTs - avoids Rigetti compiler issues"""
+        qc.cx(i, j)
+        qc.cx(j, i)
+        qc.cx(i, j)
+    
+    def apply_control_operation(self, qc: QuantumCircuit, ascii_code: int, 
+                                input_bits: List[int], target_bits: List[int] = None):
+        """Apply quantum gates - MANUAL SWAP VERSION"""
+        
+        if ascii_code == 0:  # NUL - Identity
+            pass
+            
+        elif ascii_code == 3:  # ETX - Full superposition
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+            
+        elif ascii_code == 7:  # BEL - Entanglement
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            
+        elif ascii_code == 8:  # BS - Complete flip
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+            
+        elif ascii_code == 22:  # SYN - Controlled flips
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            
+        elif ascii_code == 24:  # CAN - XOR to target
+            if target_bits:
+                for i, (inp, tgt) in enumerate(zip(input_bits, target_bits)):
+                    if inp != tgt:
+                        qc.x(i)
+                    
+        elif ascii_code == 26:  # SUB - Swap (MANUAL)
+            self.manual_swap(qc, 0, 2)
+        
+        elif ascii_code == 1:  # SOH
+            qc.x(0)
+            qc.h(1)
+            qc.h(2)
+            
+        elif ascii_code == 2:  # STX
+            qc.x(1)
+            qc.h(0)
+            qc.h(2)
+            
+        elif ascii_code == 4:  # EOT
+            qc.x(2)
+            qc.cx(2, 0)
+            qc.cx(2, 1)
+            
+        elif ascii_code == 5:  # ENQ
+            qc.h(0)
+            qc.cx(0, 1)
+            
+        elif ascii_code == 6:  # ACK
+            qc.h(1)
+            qc.cz(0, 1)
+            qc.h(1)
+            
+        elif ascii_code == 9:  # HT - Rotate right (MANUAL SWAPS)
+            self.manual_swap(qc, 1, 2)
+            self.manual_swap(qc, 0, 1)
+            
+        elif ascii_code == 10:  # LF
+            qc.rz(np.pi/2, 0)
+            qc.rz(np.pi/2, 1)
+            qc.rz(np.pi/2, 2)
+            
+        elif ascii_code == 11:  # VT
+            qc.ry(np.pi/2, 0)
+            qc.ry(np.pi/2, 1)
+            qc.ry(np.pi/2, 2)
+            
+        elif ascii_code == 12:  # FF
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+            
+        elif ascii_code == 13:  # CR - Rotate left (MANUAL SWAPS)
+            self.manual_swap(qc, 0, 1)
+            self.manual_swap(qc, 1, 2)
+            
+        elif ascii_code == 14:  # SO
+            qc.s(0)
+            qc.s(1)
+            qc.s(2)
+            
+        elif ascii_code == 15:  # SI
+            qc.sdg(0)
+            qc.sdg(1)
+            qc.sdg(2)
+            
+        elif ascii_code == 16:  # DLE
+            qc.t(0)
+            qc.t(1)
+            qc.t(2)
+            
+        elif ascii_code == 17:  # DC1
+            qc.h(0)
+            qc.h(1)
+            qc.cx(0, 2)
+            
+        elif ascii_code == 18:  # DC2
+            qc.y(1)
+            
+        elif ascii_code == 19:  # DC3
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            qc.h(0)
+            
+        elif ascii_code == 20:  # DC4
+            qc.z(1)
+            
+        elif ascii_code == 21:  # NAK
+            qc.z(0)
+            qc.z(1)
+            qc.z(2)
+            
+        elif ascii_code == 23:  # ETB
+            qc.h(2)
+            qc.cx(2, 0)
+            
+        elif ascii_code == 25:  # EM
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.ccx(0, 1, 2)
+            
+        elif ascii_code == 27:  # ESC
+            qc.cz(0, 1)
+            qc.cz(1, 2)
+            qc.cz(0, 2)
+            
+        elif ascii_code == 28:  # FS - MANUAL SWAP
+            self.manual_swap(qc, 0, 1)
+            
+        elif ascii_code == 29:  # GS
+            qc.ry(np.pi/4, 1)
+            qc.cx(0, 1)
+            qc.ry(np.pi/4, 2)
+            qc.cx(1, 2)
+            
+        elif ascii_code == 30:  # RS - MANUAL SWAP
+            qc.s(0)
+            self.manual_swap(qc, 1, 2)
+            
+        elif ascii_code == 31:  # US
+            qc.ccx(0, 1, 2)
+            
+        elif ascii_code == 127:  # DEL
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+        
+        return qc
+    
+    def create_circuit(self, initial_state: str, ctrl_name: str) -> QuantumCircuit:
+        """Create circuit for operator test"""
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize state
+        input_bits = [int(b) for b in initial_state]
+        for i, bit in enumerate(input_bits):
+            if bit == 1:
+                qc.x(i)
+        
+        # Apply operator
+        ascii_code, _ = self.control_chars[ctrl_name]
+        self.apply_control_operation(qc, ascii_code, input_bits)
+        
+        # Measure
+        qc.measure([0, 1, 2], [0, 1, 2])
+        return qc
+    
+    def run_experiment(self, qc: QuantumCircuit, shots: int = 100) -> Dict:
+        """Run circuit and extract counts"""
+        try:
+            qc_trans = transpile(qc, backend=self.backend, optimization_level=3)
+            job = self.backend.run(qc_trans, shots=shots)
+            result = job.result()
+            
+            if not result.success:
+                return {}
+            
+            # Extract counts
+            result_dict = result.to_dict()
+            if 'results' in result_dict and len(result_dict['results']) > 0:
+                first_result = result_dict['results'][0]
+                if 'data' in first_result and 'counts' in first_result['data']:
+                    counts = first_result['data']['counts']
+                    # Convert hex to binary if needed
+                    clean_counts = {}
+                    for key, val in counts.items():
+                        if key.startswith('0x'):
+                            binary = bin(int(key, 16))[2:].zfill(3)
+                            clean_counts[binary] = val
+                        else:
+                            clean_counts[key] = val
+                    return clean_counts
+            return {}
+            
+        except Exception as e:
+            self.log(f"  ✗ Error: {str(e)[:100]}")
+            return {}
+    
+    def calculate_metrics(self, counts: Dict, shots: int, input_state: str) -> Dict:
+        """Calculate metrics"""
+        if not counts:
+            return {
+                'entropy': 0.0, 'num_states': 0, 'input_prob': 0.0,
+                'max_prob': 0.0, 'operation_type': 'FAILED'
+            }
+        
+        probs = {state: count/shots for state, count in counts.items()}
+        
+        # Calculate entropy properly
+        entropy = 0.0
+        for p in probs.values():
+            if p > 0:
+                entropy -= p * np.log2(p)
+        
+        num_states = len(counts)
+        max_prob = max(probs.values())
+        input_prob = probs.get(input_state, 0.0)
+        
+        # Classify
+        if num_states == 1 and max_prob > 0.95:
+            op_type = 'IDENTITY' if input_prob > 0.95 else 'DETERMINISTIC'
+        elif entropy > 2.9:
+            op_type = 'FULL_SUPERPOSITION'
+        elif num_states == 2 and abs(list(probs.values())[0] - 0.5) < 0.15:
+            op_type = 'BELL_PAIR'
+        elif entropy > 2.0:
+            op_type = 'PARTIAL_SUPERPOSITION'
+        elif entropy > 1.0:
+            op_type = 'MIXED_STATE'
+        else:
+            op_type = 'CONTROLLED'
+        
+        return {
+            'entropy': entropy, 'num_states': num_states,
+            'input_prob': input_prob, 'max_prob': max_prob,
+            'operation_type': op_type, 'probs': probs
+        }
+
+
+def main():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    log_filename = f"complete_operator_dict_{timestamp}.log"
+    csv_filename = f"complete_operator_dict_{timestamp}.csv"
+    
+    print(f"📁 Output files:")
+    print(f"  LOG:  {log_filename}")
+    print(f"  CSV:  {csv_filename}\n")
+    
+    # Connect
+    print("🔌 Connecting to Azure Quantum...")
+    workspace = Workspace.from_connection_string(CONNECTION_STRING)
+    provider = AzureQuantumProvider(workspace)
+    backend = provider.get_backend('rigetti.sim.qvm')
+    print("✓ Connected to Rigetti QVM\n")
+    
+    mapper = QuantumOperatorDictionary(backend)
+    
+    # Open log
+    mapper.log_file = open(log_filename, 'w', encoding='utf-8')
+    mapper.log("="*80)
+    mapper.log("🔬 COMPLETE ASCII QUANTUM OPERATOR DICTIONARY")
+    mapper.log("="*80)
+    mapper.log(f"Timestamp: {datetime.now()}")
+    mapper.log(f"Backend: Rigetti QVM")
+    mapper.log(f"Shots per experiment: 100")
+    mapper.log("="*80 + "\n")
+    
+    # Setup CSV
+    csv_file = open(csv_filename, 'w', newline='', encoding='utf-8')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow([
+        'experiment_id', 'operator', 'ascii_code', 'input_state',
+        'output_state', 'output_prob', 'operation_type', 'entropy',
+        'num_states', 'all_outputs'
+    ])
+    
+    # PART A: Fix failed operators on |101⟩
+    failed_ops = ['SUB', 'HT', 'CR', 'FS', 'RS']
+    
+    mapper.log("="*80)
+    mapper.log("PART A: TESTING PREVIOUSLY FAILED OPERATORS (FIXED)")
+    mapper.log("="*80 + "\n")
+    
+    shots = 100
+    exp_id = 1
+    total_exp = len(failed_ops) + 8 * 10  # Part A + Part B
+    
+    for ctrl in failed_ops:
+        mapper.log(f"{'─'*80}")
+        mapper.log(f"🔬 EXPERIMENT {exp_id}/{total_exp}: |101⟩ ⊗ <{ctrl}>")
+        mapper.log(f"{'─'*80}")
+        
+        ascii_code, description = mapper.control_chars[ctrl]
+        mapper.log(f"  Operator: {ctrl} (ASCII {ascii_code}) - {description}")
+        
+        qc = mapper.create_circuit('101', ctrl)
+        mapper.log(f"  Circuit: depth={qc.depth()}, gates={qc.size()}")
+        mapper.log(f"  Running {shots} shots on Rigetti QVM...")
+        
+        counts = mapper.run_experiment(qc, shots)
+        metrics = mapper.calculate_metrics(counts, shots, '101')
+        
+        if counts:
+            mapper.log(f"  ✓ SUCCESS!")
+            mapper.log(f"  Operation Type: {metrics['operation_type']}")
+            mapper.log(f"  Entropy: {metrics['entropy']:.3f} bits")
+            mapper.log(f"  Unique States: {metrics['num_states']}")
+            
+            # Show all outcomes
+            mapper.log(f"\n  📊 Measurement Results:")
+            sorted_states = sorted(counts.items(), key=lambda x: -x[1])
+            for state, count in sorted_states:
+                prob = count / shots
+                bar = '█' * int(prob * 30)
+                marker = ' ← INPUT' if state == '101' else ''
+                mapper.log(f"    |{state}⟩: {prob*100:5.1f}% ({count:3d}/{shots}) {bar}{marker}")
+            
+            # Get top output
+            top_state = max(counts.items(), key=lambda x: x[1])
+            mapper.log(f"\n  Result: |101⟩ → |{top_state[0]}⟩ (probability {top_state[1]/shots:.3f})")
+            
+            # Write CSV
+            csv_writer.writerow([
+                exp_id, ctrl, ascii_code, '101',
+                top_state[0], f"{top_state[1]/shots:.3f}",
+                metrics['operation_type'], f"{metrics['entropy']:.3f}",
+                metrics['num_states'], str(counts)
+            ])
+            csv_file.flush()
+        else:
+            mapper.log(f"  ✗ FAILED")
+        
+        mapper.log("")
+        exp_id += 1
+        time.sleep(0.3)
+    
+    # PART B: Test all 33 operators on all 8 input states
+    mapper.log("\n" + "="*80)
+    mapper.log("PART B: ALL OPERATORS ON ALL INPUT STATES")
+    mapper.log("="*80 + "\n")
+    
+    all_inputs = ['000', '001', '010', '011', '100', '101', '110', '111']
+    
+    # Test top operators
+    test_ops = ['NUL', 'ETX', 'BEL', 'BS', 'SYN', 'ACK', 'ENQ', 'SOH', 'STX', 'EOT']
+    
+    for ctrl in test_ops:
+        mapper.log(f"\n{'='*80}")
+        mapper.log(f"🎯 TESTING OPERATOR: {ctrl}")
+        ascii_code, description = mapper.control_chars[ctrl]
+        mapper.log(f"   ASCII {ascii_code}: {description}")
+        mapper.log(f"{'='*80}\n")
+        
+        for input_state in all_inputs:
+            mapper.log(f"  [{exp_id}/{total_exp}] |{input_state}⟩ ⊗ <{ctrl}> → ", flush=True)
+            
+            qc = mapper.create_circuit(input_state, ctrl)
+            counts = mapper.run_experiment(qc, shots)
+            metrics = mapper.calculate_metrics(counts, shots, input_state)
+            
+            if counts:
+                top_state = max(counts.items(), key=lambda x: x[1])
+                mapper.log(f"|{top_state[0]}⟩ ({top_state[1]/shots*100:.0f}%) [{metrics['operation_type']}, H={metrics['entropy']:.2f}]")
+                
+                # Write CSV
+                csv_writer.writerow([
+                    exp_id, ctrl, ascii_code, input_state,
+                    top_state[0], f"{top_state[1]/shots:.3f}",
+                    metrics['operation_type'], f"{metrics['entropy']:.3f}",
+                    metrics['num_states'], str(counts)
+                ])
+                csv_file.flush()
+            else:
+                mapper.log(f"FAILED")
+            
+            exp_id += 1
+            time.sleep(0.2)
+    
+    # Summary
+    mapper.log("\n\n" + "="*80)
+    mapper.log("✅ DICTIONARY COMPLETE!")
+    mapper.log("="*80)
+    mapper.log(f"Total experiments: {exp_id - 1}")
+    mapper.log(f"Output saved to: {csv_filename}")
+    
+    mapper.log_file.close()
+    csv_file.close()
+    
+    print(f"\n{'='*80}")
+    print(f"✅ COMPLETE! Check files:")
+    print(f"  📄 {log_filename}")
+    print(f"  📊 {csv_filename}")
+    print(f"{'='*80}\n")
+
+
+if __name__ == "__main__":
+    main()

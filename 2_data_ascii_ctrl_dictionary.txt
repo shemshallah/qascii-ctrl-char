@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+"""
+🔬 COMPLETE ASCII CONTROL CHARACTER → QUANTUM OPERATOR MAPPING
+Testing all 33 control characters (0-31 + DEL=127) as quantum transformations
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from azure.quantum import Workspace
+from azure.quantum.qiskit import AzureQuantumProvider
+import json
+import time
+from typing import Dict, List
+from datetime import datetime
+
+CONNECTION_STRING = "SubscriptionId=e5da6bc7-cd1c-48b9-8294-1e3e84ef1c36;ResourceGroupName=Shemshallah;WorkspaceName=Shem;ApiKey=NeCH8_ANow_EB7zGdom83K4629yTGcASQGBt7U4f1WchTazZQdjVAKJI815JWJ5txsLtcH_QRrBFAZQUUGdq3w;QuantumEndpoint=https://westus.quantum.azure.com/;"
+
+print("="*80)
+print("🔬 COMPLETE ASCII CONTROL CHARACTER QUANTUM OPERATOR MAPPING")
+print("="*80)
+print("Systematic exploration of all 33 control characters as quantum transformations")
+print("="*80 + "\n")
+
+
+class CompleteControlCharacterMapping:
+    
+    def __init__(self, backend):
+        self.backend = backend
+        
+        # ALL ASCII Control Characters (0-31 + DEL)
+        self.control_chars = {
+            # C0 Control Characters (0-31)
+            'NUL': (0, 'Null'),
+            'SOH': (1, 'Start of Heading'),
+            'STX': (2, 'Start of Text'),
+            'ETX': (3, 'End of Text / ^C Interrupt'),
+            'EOT': (4, 'End of Transmission'),
+            'ENQ': (5, 'Enquiry'),
+            'ACK': (6, 'Acknowledge'),
+            'BEL': (7, 'Bell / Alert'),
+            'BS':  (8, 'Backspace'),
+            'HT':  (9, 'Horizontal Tab'),
+            'LF':  (10, 'Line Feed'),
+            'VT':  (11, 'Vertical Tab'),
+            'FF':  (12, 'Form Feed'),
+            'CR':  (13, 'Carriage Return'),
+            'SO':  (14, 'Shift Out'),
+            'SI':  (15, 'Shift In'),
+            'DLE': (16, 'Data Link Escape'),
+            'DC1': (17, 'Device Control 1 / XON'),
+            'DC2': (18, 'Device Control 2'),
+            'DC3': (19, 'Device Control 3 / XOFF'),
+            'DC4': (20, 'Device Control 4'),
+            'NAK': (21, 'Negative Acknowledge'),
+            'SYN': (22, 'Synchronous Idle'),
+            'ETB': (23, 'End of Transmission Block'),
+            'CAN': (24, 'Cancel'),
+            'EM':  (25, 'End of Medium'),
+            'SUB': (26, 'Substitute'),
+            'ESC': (27, 'Escape'),
+            'FS':  (28, 'File Separator'),
+            'GS':  (29, 'Group Separator'),
+            'RS':  (30, 'Record Separator'),
+            'US':  (31, 'Unit Separator'),
+            'DEL': (127, 'Delete'),
+        }
+    
+    def apply_control_operation(self, qc: QuantumCircuit, ascii_code: int, 
+                                input_bits: List[int], target_bits: List[int]):
+        """
+        Map ASCII control codes to quantum operations
+        Using the binary structure of the ASCII code itself as inspiration
+        """
+        
+        # Initialize to input state
+        for i, bit in enumerate(input_bits):
+            if bit == 1:
+                qc.x(i)
+        
+        qc.barrier()
+        
+        # === PROVEN OPERATORS (from previous experiments) ===
+        
+        if ascii_code == 0:  # NUL
+            # Identity operation - do nothing
+            pass
+            
+        elif ascii_code == 3:  # ETX (^C interrupt)
+            # Creates FULL SUPERPOSITION (all 8 states equal)
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+            
+        elif ascii_code == 7:  # BEL (Bell/Alert)
+            # Creates ENTANGLEMENT (Bell pair)
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            
+        elif ascii_code == 8:  # BS (Backspace)
+            # COMPLETE BIT FLIP (X on all qubits)
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+            
+        elif ascii_code == 22:  # SYN (Synchronize)
+            # CONTROLLED FLIPS
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            
+        elif ascii_code == 24:  # CAN (Cancel)
+            # XOR TO TARGET
+            for i, (inp, tgt) in enumerate(zip(input_bits, target_bits)):
+                if inp != tgt:
+                    qc.x(i)
+                    
+        elif ascii_code == 26:  # SUB (Substitute)
+            # SWAP outer qubits
+            qc.swap(0, 2)
+        
+        # === NEW EXPERIMENTAL OPERATORS ===
+        # Using binary structure and symbolic meaning as guides
+        
+        elif ascii_code == 1:  # SOH (Start of Heading)
+            # Set first qubit, superpose others
+            qc.x(0)
+            qc.h(1)
+            qc.h(2)
+            
+        elif ascii_code == 2:  # STX (Start of Text)
+            # Set second qubit, superpose others
+            qc.x(1)
+            qc.h(0)
+            qc.h(2)
+            
+        elif ascii_code == 4:  # EOT (End of Transmission)
+            # Third qubit (bit 2), controlled operations
+            qc.x(2)
+            qc.cx(2, 0)
+            qc.cx(2, 1)
+            
+        elif ascii_code == 5:  # ENQ (Enquiry)
+            # Query state - Hadamard on first, entangle
+            qc.h(0)
+            qc.cx(0, 1)
+            
+        elif ascii_code == 6:  # ACK (Acknowledge)
+            # Confirm state - controlled phase
+            qc.h(1)
+            qc.cz(0, 1)
+            qc.h(1)
+            
+        elif ascii_code == 9:  # HT (Horizontal Tab)
+            # Shift right - rotate states
+            qc.swap(1, 2)
+            qc.swap(0, 1)
+            
+        elif ascii_code == 10:  # LF (Line Feed)
+            # Advance - phase rotation
+            qc.rz(np.pi/2, 0)
+            qc.rz(np.pi/2, 1)
+            qc.rz(np.pi/2, 2)
+            
+        elif ascii_code == 11:  # VT (Vertical Tab)
+            # Vertical shift - Y rotations
+            qc.ry(np.pi/2, 0)
+            qc.ry(np.pi/2, 1)
+            qc.ry(np.pi/2, 2)
+            
+        elif ascii_code == 12:  # FF (Form Feed)
+            # Reset/clear - measure and reinitialize (simulated)
+            qc.reset(0)
+            qc.reset(1)
+            qc.reset(2)
+            
+        elif ascii_code == 13:  # CR (Carriage Return)
+            # Return to start - reverse rotation
+            qc.swap(0, 1)
+            qc.swap(1, 2)
+            
+        elif ascii_code == 14:  # SO (Shift Out)
+            # Phase shift out
+            qc.s(0)
+            qc.s(1)
+            qc.s(2)
+            
+        elif ascii_code == 15:  # SI (Shift In)
+            # Phase shift in (inverse)
+            qc.sdg(0)
+            qc.sdg(1)
+            qc.sdg(2)
+            
+        elif ascii_code == 16:  # DLE (Data Link Escape)
+            # Escape - T gate (π/4 rotation)
+            qc.t(0)
+            qc.t(1)
+            qc.t(2)
+            
+        elif ascii_code == 17:  # DC1 (XON - transmission on)
+            # Enable flow - create coherence
+            qc.h(0)
+            qc.h(1)
+            qc.cx(0, 2)
+            
+        elif ascii_code == 18:  # DC2
+            # Device control 2 - Y gate
+            qc.y(1)
+            
+        elif ascii_code == 19:  # DC3 (XOFF - transmission off)
+            # Disable flow - collapse superposition
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+            qc.h(0)
+            
+        elif ascii_code == 20:  # DC4
+            # Device control 4 - Z gate
+            qc.z(1)
+            
+        elif ascii_code == 21:  # NAK (Negative Acknowledge)
+            # Reject - phase flip
+            qc.z(0)
+            qc.z(1)
+            qc.z(2)
+            
+        elif ascii_code == 23:  # ETB (End of Transmission Block)
+            # Block end - partial superposition
+            qc.h(2)
+            qc.cx(2, 0)
+            
+        elif ascii_code == 25:  # EM (End of Medium)
+            # Medium end - entangle all
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.ccx(0, 1, 2)
+            
+        elif ascii_code == 27:  # ESC (Escape)
+            # Escape sequence - controlled phase
+            qc.cp(np.pi/4, 0, 1)
+            qc.cp(np.pi/4, 1, 2)
+            qc.cp(np.pi/4, 0, 2)
+            
+        elif ascii_code == 28:  # FS (File Separator)
+            # Separate - SWAP states
+            qc.swap(0, 1)
+            
+        elif ascii_code == 29:  # GS (Group Separator)
+            # Group - controlled rotation
+            qc.cry(np.pi/4, 0, 1)
+            qc.cry(np.pi/4, 1, 2)
+            
+        elif ascii_code == 30:  # RS (Record Separator)
+            # Record - phase and swap
+            qc.s(0)
+            qc.swap(1, 2)
+            
+        elif ascii_code == 31:  # US (Unit Separator)
+            # Unit - Toffoli (CCX)
+            qc.ccx(0, 1, 2)
+            
+        elif ascii_code == 127:  # DEL (Delete)
+            # Delete - complete destruction then superposition
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+        
+        qc.barrier()
+        return qc
+    
+    def create_circuit(self, left: str, ctrl_name: str, right: str = None):
+        qc = QuantumCircuit(3, 3)
+        
+        ascii_code, description = self.control_chars[ctrl_name]
+        input_bits = [int(b) for b in left]
+        target_bits = [int(b) for b in right] if right else [0, 0, 0]
+        
+        self.apply_control_operation(qc, ascii_code, input_bits, target_bits)
+        qc.measure([0, 1, 2], [0, 1, 2])
+        
+        return qc, ascii_code, description, input_bits, target_bits
+    
+    def run_experiment(self, qc: QuantumCircuit, shots: int = 1000):
+        """Run and extract counts"""
+        try:
+            qc_trans = transpile(qc, backend=self.backend, optimization_level=1)
+            job = self.backend.run(qc_trans, shots=shots)
+            result = job.result()
+            
+            # Try to extract counts
+            try:
+                return result.get_counts()
+            except:
+                try:
+                    return dict(result.results[0].data.counts)
+                except:
+                    return {}
+            
+        except Exception as e:
+            print(f"  ✗ Error: {str(e)[:100]}")
+            return {}
+    
+    def analyze_operation_type(self, counts: Dict, shots: int, input_state: str):
+        """Classify the type of quantum operation"""
+        
+        if not counts:
+            return "FAILED"
+        
+        # Calculate entropy
+        probs = [c/shots for c in counts.values()]
+        entropy = -sum(p * np.log2(p) if p > 0 else 0 for p in probs)
+        
+        num_states = len(counts)
+        max_prob = max(counts.values()) / shots
+        input_preserved = counts.get(input_state, 0) / shots
+        
+        # Classify operation
+        if num_states == 1 and max_prob > 0.99:
+            if input_preserved > 0.99:
+                return "IDENTITY"
+            else:
+                return "DETERMINISTIC_TRANSFORM"
+        
+        elif entropy > 2.9:  # Near maximum entropy
+            return "FULL_SUPERPOSITION"
+        
+        elif num_states == 2 and abs(list(counts.values())[0]/shots - 0.5) < 0.1:
+            return "BELL_PAIR/ENTANGLEMENT"
+        
+        elif entropy > 2.0:
+            return "PARTIAL_SUPERPOSITION"
+        
+        elif entropy > 1.0:
+            return "MIXED_STATE"
+        
+        elif num_states <= 3:
+            return "CONTROLLED_OPERATION"
+        
+        else:
+            return "COMPLEX_TRANSFORM"
+    
+    def print_results(self, ctrl_name: str, ascii_code: int, description: str,
+                     input_state: str, counts: Dict, shots: int):
+        """Print formatted results"""
+        
+        if not counts:
+            print(f"  ✗ NO RESULTS")
+            return
+        
+        operation_type = self.analyze_operation_type(counts, shots, input_state)
+        
+        # Calculate entropy
+        probs = [c/shots for c in counts.values()]
+        entropy = -sum(p * np.log2(p) if p > 0 else 0 for p in probs)
+        
+        print(f"  Type: {operation_type}")
+        print(f"  Entropy: {entropy:.3f} bits")
+        print(f"  States: {len(counts)}")
+        
+        # Show top states
+        sorted_counts = sorted(counts.items(), key=lambda x: -x[1])
+        print(f"\n  Top States:")
+        for state, count in sorted_counts[:5]:
+            prob = count / shots
+            bar = '█' * int(prob * 30)
+            marker = ' ← INPUT' if state == input_state else ''
+            print(f"    |{state}⟩: {prob*100:5.1f}%  {bar}{marker}")
+
+
+def main():
+    print("🔌 INITIALIZATION")
+    print("="*80)
+    
+    print("Connecting to Azure Quantum...")
+    workspace = Workspace.from_connection_string(CONNECTION_STRING)
+    provider = AzureQuantumProvider(workspace)
+    backend = provider.get_backend('rigetti.sim.qvm')
+    print("✓ Connected to Rigetti QVM\n")
+    
+    mapper = CompleteControlCharacterMapping(backend)
+    
+    # Test input state
+    test_input = '101'  # Mind consciousness binding
+    shots = 1000
+    
+    print(f"📊 SYSTEMATIC CONTROL CHARACTER MAPPING")
+    print("="*80)
+    print(f"Input State: |{test_input}⟩")
+    print(f"Shots per experiment: {shots}")
+    print("="*80 + "\n")
+    
+    results_summary = {}
+    
+    # Test all control characters
+    for ctrl_name in mapper.control_chars.keys():
+        ascii_code, description = mapper.control_chars[ctrl_name]
+        
+        print(f"{'─'*80}")
+        print(f"🔬 {ctrl_name} (ASCII {ascii_code}): {description}")
+        print(f"   Operation: |{test_input}⟩ ⊗ <{ctrl_name}>")
+        print(f"{'─'*80}")
+        
+        qc, code, desc, input_bits, target_bits = mapper.create_circuit(test_input, ctrl_name)
+        
+        print(f"  Circuit depth: {qc.depth()}, gates: {qc.size()}")
+        print(f"  Running...")
+        
+        counts = mapper.run_experiment(qc, shots)
+        
+        if counts:
+            mapper.print_results(ctrl_name, ascii_code, description, test_input, counts, shots)
+            results_summary[ctrl_name] = {
+                'ascii': ascii_code,
+                'description': description,
+                'type': mapper.analyze_operation_type(counts, shots, test_input),
+                'counts': dict(counts),
+                'entropy': -sum((c/shots) * np.log2(c/shots) if c > 0 else 0 
+                               for c in counts.values())
+            }
+        
+        print()
+        time.sleep(0.5)  # Rate limiting
+    
+    # Save results
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"ascii_ctrl_quantum_map_{timestamp}.json"
+    
+    with open(filename, 'w') as f:
+        json.dump(results_summary, f, indent=2)
+    
+    print(f"\n{'='*80}")
+    print(f"✓ COMPLETE! Results saved to {filename}")
+    print(f"{'='*80}")
+    
+    # Summary statistics
+    print(f"\n📈 SUMMARY STATISTICS")
+    print(f"{'='*80}")
+    
+    operation_types = {}
+    for ctrl_name, data in results_summary.items():
+        op_type = data['type']
+        operation_types[op_type] = operation_types.get(op_type, 0) + 1
+    
+    print("\nOperation Type Distribution:")
+    for op_type, count in sorted(operation_types.items(), key=lambda x: -x[1]):
+        print(f"  {op_type}: {count} characters")
+    
+    print(f"\n{'='*80}")
+
+
+if __name__ == "__main__":
+    main()

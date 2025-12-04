@@ -1,0 +1,17 @@
+operator,eigenvector,output_state,probability,eigenvalue
+SYN,000,101,1.0000,transform
+SYN,001,001,1.0000,+1
+SYN,010,111,1.0000,transform
+SYN,011,011,1.0000,+1
+SYN,100,100,1.0000,+1
+SYN,101,000,1.0000,transform
+SYN,110,110,1.0000,+1
+SYN,111,010,1.0000,transform
+ACK,000,111,1.0000,transform
+ACK,001,011,1.0000,transform
+ACK,010,101,1.0000,transform
+ACK,011,001,1.0000,transform
+ACK,100,110,1.0000,transform
+ACK,101,010,1.0000,transform
+ACK,110,100,1.0000,transform
+ACK,111,000,1.0000,transform

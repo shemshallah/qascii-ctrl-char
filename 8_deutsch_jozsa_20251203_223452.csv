@@ -1,0 +1,4 @@
+function_type,prob_000,entropy,detected,correct
+constant_0,1.0,0.0,CONSTANT,True
+constant_1,0.0,0.0,BALANCED,False
+balanced,1.0,0.0,CONSTANT,False

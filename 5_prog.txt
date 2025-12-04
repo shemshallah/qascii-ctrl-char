@@ -1,0 +1,417 @@
+
+#!/usr/bin/env python3
+"""
+🔬 SCRIPT 2: META-CIRCUIT ASCII QUANTUM ALGORITHM COMPOSER
+Compose multiple ASCII control operators into functional quantum algorithms
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from azure.quantum import Workspace
+from azure.quantum.qiskit import AzureQuantumProvider
+import csv
+from typing import Dict, List, Tuple
+from datetime import datetime
+
+CONNECTION_STRING = "SubscriptionId=####;ResourceGroupName=Shemshallah;WorkspaceName=###@#;ApiKey=####;QuantumEndpoint=https://westus.quantum.azure.com/;"
+
+print("="*80)
+print("🔬 SCRIPT 2: META-CIRCUIT ASCII QUANTUM ALGORITHM COMPOSER")
+print("="*80)
+print("Compose ASCII operators into functional algorithms")
+print("="*80 + "\n")
+
+
+class ASCIIQuantumAlgorithm:
+    """Compose multiple ASCII operators into quantum algorithms"""
+    
+    def __init__(self, backend):
+        self.backend = backend
+        self.log_file = None
+        
+        # Import operator definitions from previous experiment
+        self.control_chars = {
+            'NUL': (0, 'Null'),
+            'SOH': (1, 'Start of Heading'),
+            'STX': (2, 'Start of Text'),
+            'ETX': (3, 'End of Text / ^C Interrupt'),
+            'EOT': (4, 'End of Transmission'),
+            'ENQ': (5, 'Enquiry'),
+            'ACK': (6, 'Acknowledge'),
+            'BEL': (7, 'Bell / Alert'),
+            'BS':  (8, 'Backspace'),
+            'HT':  (9, 'Horizontal Tab'),
+            'CR':  (13, 'Carriage Return'),
+            'SYN': (22, 'Synchronous Idle'),
+            'SUB': (26, 'Substitute'),
+            'FS':  (28, 'File Separator'),
+            'RS':  (30, 'Record Separator'),
+        }
+        
+        # Define algorithm templates (operator sequences)
+        self.algorithms = {
+            'TELEPORT': {
+                'name': 'Quantum Teleportation',
+                'sequence': ['BEL', 'ENQ', 'ACK'],  # Entangle, Query, Acknowledge
+                'description': 'BEL creates entanglement, ENQ queries state, ACK finalizes transfer'
+            },
+            'FLIP_CHAIN': {
+                'name': 'Cascading Bit Flip',
+                'sequence': ['SYN', 'BS', 'EOT'],  # Sync, Flip, End
+                'description': 'Controlled flip pattern through state space'
+            },
+            'ROTATE_CYCLE': {
+                'name': 'State Rotation Cycle',
+                'sequence': ['HT', 'CR', 'HT'],  # Tab right, return left, tab right
+                'description': 'Cyclical bit rotation pattern'
+            },
+            'SEARCH_PATTERN': {
+                'name': 'Quantum Search',
+                'sequence': ['ETX', 'BEL', 'ACK', 'ETX'],  # Superpose, Entangle, Measure, Reset
+                'description': 'Create superposition, entangle, collapse, reinitialize'
+            },
+            'ENCODE_DECODE': {
+                'name': 'Quantum Encoding',
+                'sequence': ['BS', 'ENQ', 'BS'],  # Invert, Query, Restore
+                'description': 'Bit inversion encoding with query'
+            },
+            'SWAP_ECHO': {
+                'name': 'Swap and Echo',
+                'sequence': ['FS', 'SUB', 'FS'],  # Swap 0-1, Swap 0-2, Swap 0-1
+                'description': 'Complex swap pattern for state transformation'
+            },
+            'BELL_CASCADE': {
+                'name': 'Cascading Entanglement',
+                'sequence': ['BEL', 'BEL', 'BEL'],  # Triple entanglement
+                'description': 'Multiple entanglement operations'
+            },
+            'HADAMARD_WALK': {
+                'name': 'Superposition Walk',
+                'sequence': ['ETX', 'SYN', 'ETX'],  # H-gates, controlled, H-gates
+                'description': 'Random walk through superposition states'
+            },
+            'CONTROL_FLOW': {
+                'name': 'Quantum Control Flow',
+                'sequence': ['SOH', 'SYN', 'EOT', 'ACK'],  # Start, Sync, End, Ack
+                'description': 'Simulated control flow structure'
+            },
+            'PHASE_SHIFT': {
+                'name': 'Phase Manipulation',
+                'sequence': ['BEL', 'ACK', 'ENQ'],  # Entangle, Phase shift, Query
+                'description': 'Controlled phase manipulation sequence'
+            }
+        }
+        
+    def log(self, message, flush=False):
+        """Write to both console and log file"""
+        print(message, flush=flush)
+        if self.log_file:
+            self.log_file.write(message + '\n')
+            if flush:
+                self.log_file.flush()
+    
+    def manual_swap(self, qc, i, j):
+        """Implement SWAP using 3 CNOTs"""
+        qc.cx(i, j)
+        qc.cx(j, i)
+        qc.cx(i, j)
+    
+    def apply_control_operation(self, qc: QuantumCircuit, ascii_code: int):
+        """Apply single ASCII operator"""
+        if ascii_code == 0:  # NUL
+            pass
+        elif ascii_code == 3:  # ETX
+            qc.h(0)
+            qc.h(1)
+            qc.h(2)
+        elif ascii_code == 7:  # BEL
+            qc.h(0)
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+        elif ascii_code == 8:  # BS
+            qc.x(0)
+            qc.x(1)
+            qc.x(2)
+        elif ascii_code == 22:  # SYN
+            qc.cx(0, 1)
+            qc.cx(0, 2)
+        elif ascii_code == 26:  # SUB
+            self.manual_swap(qc, 0, 2)
+        elif ascii_code == 1:  # SOH
+            qc.x(0)
+            qc.h(1)
+            qc.h(2)
+        elif ascii_code == 2:  # STX
+            qc.x(1)
+            qc.h(0)
+            qc.h(2)
+        elif ascii_code == 4:  # EOT
+            qc.x(2)
+            qc.cx(2, 0)
+            qc.cx(2, 1)
+        elif ascii_code == 5:  # ENQ
+            qc.h(0)
+            qc.cx(0, 1)
+        elif ascii_code == 6:  # ACK
+            qc.h(1)
+            qc.cz(0, 1)
+            qc.h(1)
+        elif ascii_code == 9:  # HT
+            self.manual_swap(qc, 1, 2)
+            self.manual_swap(qc, 0, 1)
+        elif ascii_code == 13:  # CR
+            self.manual_swap(qc, 0, 1)
+            self.manual_swap(qc, 1, 2)
+        elif ascii_code == 28:  # FS
+            self.manual_swap(qc, 0, 1)
+        elif ascii_code == 30:  # RS
+            qc.s(0)
+            self.manual_swap(qc, 1, 2)
+        return qc
+    
+    def create_algorithm_circuit(self, initial_state: str, algorithm_name: str) -> Tuple[QuantumCircuit, List[str]]:
+        """Create circuit by composing operator sequence"""
+        qc = QuantumCircuit(3, 3)
+        
+        # Initialize state
+        for i, bit in enumerate(initial_state):
+            if bit == '1':
+                qc.x(i)
+        
+        # Get algorithm sequence
+        algo = self.algorithms[algorithm_name]
+        sequence = algo['sequence']
+        
+        # Apply each operator in sequence
+        for op_name in sequence:
+            ascii_code, _ = self.control_chars[op_name]
+            self.apply_control_operation(qc, ascii_code)
+        
+        # Measure
+        qc.measure([0, 1, 2], [0, 1, 2])
+        
+        return qc, sequence
+    
+    def run_experiment(self, qc: QuantumCircuit, shots: int = 200) -> Dict:
+        """Run circuit and extract counts"""
+        try:
+            qc_trans = transpile(qc, backend=self.backend, optimization_level=3)
+            job = self.backend.run(qc_trans, shots=shots)
+            result = job.result()
+            
+            if not result.success:
+                return {}
+            
+            result_dict = result.to_dict()
+            if 'results' in result_dict and len(result_dict['results']) > 0:
+                first_result = result_dict['results'][0]
+                if 'data' in first_result and 'counts' in first_result['data']:
+                    counts = first_result['data']['counts']
+                    clean_counts = {}
+                    for key, val in counts.items():
+                        if key.startswith('0x'):
+                            binary = bin(int(key, 16))[2:].zfill(3)
+                            clean_counts[binary] = val
+                        else:
+                            clean_counts[key] = val
+                    return clean_counts
+            return {}
+        except Exception as e:
+            self.log(f"  ✗ Error: {str(e)[:100]}")
+            return {}
+    
+    def analyze_algorithm(self, counts: Dict, shots: int) -> Dict:
+        """Analyze algorithm results"""
+        if not counts:
+            return {'entropy': 0.0, 'complexity': 'FAILED', 'distribution': 'NONE'}
+        
+        probs = {state: count/shots for state, count in counts.items()}
+        
+        # Calculate entropy
+        entropy = 0.0
+        for p in probs.values():
+            if p > 0:
+                entropy -= p * np.log2(p)
+        
+        num_states = len(counts)
+        max_prob = max(probs.values())
+        
+        # Classify complexity
+        if entropy < 0.5:
+            complexity = 'DETERMINISTIC'
+        elif entropy < 1.5:
+            complexity = 'LOW_ENTROPY'
+        elif entropy < 2.5:
+            complexity = 'MODERATE_ENTROPY'
+        else:
+            complexity = 'HIGH_ENTROPY'
+        
+        # Distribution pattern
+        if num_states == 1:
+            distribution = 'SINGLE_STATE'
+        elif num_states == 2 and abs(list(probs.values())[0] - 0.5) < 0.2:
+            distribution = 'BALANCED_PAIR'
+        elif num_states <= 4:
+            distribution = 'CLUSTERED'
+        else:
+            distribution = 'DISTRIBUTED'
+        
+        return {
+            'entropy': entropy,
+            'num_states': num_states,
+            'max_prob': max_prob,
+            'complexity': complexity,
+            'distribution': distribution,
+            'probs': probs
+        }
+
+
+def main():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    log_filename = f"meta_circuit_algorithms_{timestamp}.log"
+    csv_filename = f"meta_circuit_algorithms_{timestamp}.csv"
+    
+    print(f"📁 Output files:")
+    print(f"  LOG:  {log_filename}")
+    print(f"  CSV:  {csv_filename}\n")
+    
+    # Connect
+    print("🔌 Connecting to Azure Quantum...")
+    workspace = Workspace.from_connection_string(CONNECTION_STRING)
+    provider = AzureQuantumProvider(workspace)
+    backend = provider.get_backend('rigetti.sim.qvm')
+    print("✓ Connected to Rigetti QVM\n")
+    
+    composer = ASCIIQuantumAlgorithm(backend)
+    
+    # Open log
+    composer.log_file = open(log_filename, 'w', encoding='utf-8')
+    composer.log("="*80)
+    composer.log("🔬 META-CIRCUIT ASCII QUANTUM ALGORITHM COMPOSER")
+    composer.log("="*80)
+    composer.log(f"Timestamp: {datetime.now()}")
+    composer.log(f"Backend: Rigetti QVM")
+    composer.log(f"Shots per experiment: 200")
+    composer.log("="*80 + "\n")
+    
+    # Setup CSV
+    csv_file = open(csv_filename, 'w', newline='', encoding='utf-8')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow([
+        'experiment_id', 'algorithm_name', 'operator_sequence', 'sequence_length',
+        'input_state', 'top_output_state', 'top_output_prob', 
+        'entropy', 'complexity', 'distribution', 'num_unique_states',
+        'circuit_depth', 'circuit_gates', 'all_outputs'
+    ])
+    
+    # Test inputs: computational basis + superposition states
+    test_inputs = ['000', '001', '010', '011', '100', '101', '110', '111']
+    
+    shots = 200
+    exp_id = 1
+    total_exp = len(composer.algorithms) * len(test_inputs)
+    
+    composer.log("="*80)
+    composer.log("TESTING META-CIRCUIT ALGORITHMS")
+    composer.log("="*80 + "\n")
+    
+    for algo_name, algo_info in composer.algorithms.items():
+        composer.log(f"\n{'='*80}")
+        composer.log(f"🎯 ALGORITHM: {algo_info['name']}")
+        composer.log(f"   Sequence: {' → '.join(algo_info['sequence'])}")
+        composer.log(f"   Description: {algo_info['description']}")
+        composer.log(f"{'='*80}\n")
+        
+        for input_state in test_inputs:
+            composer.log(f"  [{exp_id}/{total_exp}] {algo_name}(|{input_state}⟩) = ", flush=True)
+            
+            # Create algorithm circuit
+            qc, sequence = composer.create_algorithm_circuit(input_state, algo_name)
+            
+            # Run experiment
+            counts = composer.run_experiment(qc, shots)
+            analysis = composer.analyze_algorithm(counts, shots)
+            
+            if counts:
+                top_state = max(counts.items(), key=lambda x: x[1])
+                composer.log(f"|{top_state[0]}⟩ ({top_state[1]/shots*100:.0f}%) "
+                           f"[{analysis['complexity']}, H={analysis['entropy']:.2f}, "
+                           f"{analysis['distribution']}]")
+                
+                # Write to CSV
+                csv_writer.writerow([
+                    exp_id, algo_info['name'], ' → '.join(sequence), len(sequence),
+                    input_state, top_state[0], f"{top_state[1]/shots:.3f}",
+                    f"{analysis['entropy']:.3f}", analysis['complexity'], 
+                    analysis['distribution'], analysis['num_states'],
+                    qc.depth(), qc.size(), str(counts)
+                ])
+                csv_file.flush()
+            else:
+                composer.log(f"FAILED")
+            
+            exp_id += 1
+    
+    # BONUS: Compose custom algorithm on-the-fly
+    composer.log("\n\n" + "="*80)
+    composer.log("🔥 BONUS: CUSTOM ALGORITHM COMPOSITION")
+    composer.log("="*80 + "\n")
+    
+    custom_algorithms = [
+        ('CRYPTO', ['BS', 'BEL', 'ACK', 'BS'], 'Quantum Cryptography Pattern'),
+        ('ORACLE', ['ETX', 'SYN', 'EOT'], 'Oracle Query Pattern'),
+        ('MIRROR', ['HT', 'BS', 'CR'], 'State Mirroring')
+    ]
+    
+    for custom_name, custom_seq, custom_desc in custom_algorithms:
+        composer.log(f"\n🎨 Custom: {custom_name}")
+        composer.log(f"   Sequence: {' → '.join(custom_seq)}")
+        composer.log(f"   Description: {custom_desc}\n")
+        
+        # Test on |101⟩ as example
+        qc = QuantumCircuit(3, 3)
+        qc.x(0)
+        qc.x(2)
+        
+        for op in custom_seq:
+            ascii_code, _ = composer.control_chars[op]
+            composer.apply_control_operation(qc, ascii_code)
+        
+        qc.measure([0, 1, 2], [0, 1, 2])
+        
+        counts = composer.run_experiment(qc, shots)
+        analysis = composer.analyze_algorithm(counts, shots)
+        
+        if counts:
+            composer.log(f"   |101⟩ → Results:")
+            sorted_states = sorted(counts.items(), key=lambda x: -x[1])
+            for state, count in sorted_states[:5]:  # Top 5
+                prob = count / shots
+                bar = '█' * int(prob * 40)
+                composer.log(f"      |{state}⟩: {prob*100:5.1f}% {bar}")
+            
+            composer.log(f"\n   Entropy: {analysis['entropy']:.3f} bits")
+            composer.log(f"   Complexity: {analysis['complexity']}")
+            composer.log(f"   Distribution: {analysis['distribution']}")
+    
+    # Summary
+    composer.log("\n\n" + "="*80)
+    composer.log("✅ META-CIRCUIT EXPERIMENTS COMPLETE!")
+    composer.log("="*80)
+    composer.log(f"Total algorithms tested: {len(composer.algorithms)}")
+    composer.log(f"Total experiments: {exp_id - 1}")
+    composer.log(f"Custom compositions: {len(custom_algorithms)}")
+    
+    composer.log_file.close()
+    csv_file.close()
+    
+    print(f"\n{'='*80}")
+    print(f"✅ COMPLETE! Check files:")
+    print(f"  📄 {log_filename}")
+    print(f"  📊 {csv_filename}")
+    print(f"{'='*80}\n")
+
+
+if __name__ == "__main__":
+    main()
